@@ -1,29 +1,36 @@
 using System.Collections;
 using System.Collections.Generic;
+using System.Threading;
+using Unity.VisualScripting;
 using UnityEngine;
+using UnityEngine.Tilemaps;
+using UnityEngine.UI;
 
 public class PlayerScript : MonoBehaviour
 {
     [Header("Dash")]
-    public KeyCode isDisableKey = KeyCode.LeftShift;
-    private bool isDisabled = false;
-    private float timer =0f;
-    private float timerReached = 10f;
-
-    public Transform AttackTrans;
+    public float CoolTimer = 5f;
+    private bool isCooldown = false;
+    private float UITimer = 0f;
+    private float UIStartTimer = 5f;
+    public Text CountdownText;
+    public Transform IsFrontCheck;
     private SpriteRenderer spriteRenderer;
     private Rigidbody2D rb;
 
     public int AttackDamage = 30;
 
     public float JumpHeight = 10f;
+    private bool IsTouching = true;   
+    private bool wallsliding = true;
+    public float wallSlideSpeed = 5f;
     private float horizontal;
     public float speed = 10f;
     private float vertical;
     public float DashForce;
     public float StartDashTimer;
     public float AttackRange;
-    
+
     public Animator PlayerAnim;
     public Animator EnemyAnim;
 
@@ -32,10 +39,11 @@ public class PlayerScript : MonoBehaviour
     float currentDashTimer;
     float DashDirection;
 
-    bool isGrounded = false;
     bool isDashing;
 
-    public LayerMask enemyLayers=3;
+    bool isGround = false;
+
+    public LayerMask enemyLayers = 3;
     // Flip the sprite horizontally 
     private void Start()
     {
@@ -51,18 +59,21 @@ public class PlayerScript : MonoBehaviour
 
             PlayerAnim.SetBool("Attack", true);
             Invoke("DelayedActionforStopAttck", 1.1f);
-            Collider2D[] hitArea = Physics2D.OverlapCircleAll(AttackTrans.position, AttackRange, enemyLayers);
+            Collider2D[] hitArea = Physics2D.OverlapCircleAll(IsFrontCheck.position, AttackRange, enemyLayers);
 
             foreach (Collider2D enemyCollidor in hitArea)
             {
-             
-                //Debug.Log("hits");
+
+                Debug.Log("hits");
                 enemyCollidor.GetComponent<Enemy_Controller>().TakeDamage(AttackDamage);
             }
         }
-        else if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.D))
+
+        if (Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.D))
         {
+            PlayerAnim.SetBool("Attack", false);
             PlayerAnim.Play("Idle");
+           
         }
 
         horizontal = Input.GetAxis("Horizontal");
@@ -81,37 +92,24 @@ public class PlayerScript : MonoBehaviour
         {
             if (PlayerAnim.GetBool("Jump") == false)
             {
+                isGround = false;
                 rb.AddForce(Vector2.up * JumpHeight, ForceMode2D.Impulse);
-                PlayerAnim.SetBool("Jump", true);
+                PlayerAnim.SetBool("Jump", true);           
             }
         }
 
-        if (Input.GetKeyDown(KeyCode.LeftShift) && isDisabled == false)
+        if (Input.GetKeyDown(KeyCode.LeftShift))
         {
-            timer += Time.deltaTime;
-            if (timer >= timerReached)
+            if (PlayerAnim.GetBool("Jump") == true && !isCooldown)
             {
-                isDisabled = false;
-                timer = 0f;
-            }
-          
-            if (PlayerAnim.GetBool("Jump") == true)
-            {
+                StartCoroutine(Cooldown());
                 isDashing = true;
                 currentDashTimer = StartDashTimer;
                 rb.velocity = Vector2.zero;
-                DashDirection = (int)horizontal;                                            
+                DashDirection = (int)horizontal;                  
             }
 
         }
-        else
-        {
-            if (Input.GetKeyDown(isDisableKey))
-            {
-                isDisabled = true;
-            }
-        }
-
         if (isDashing)
         {
             rb.velocity = transform.right * DashDirection * DashForce;
@@ -131,9 +129,7 @@ public class PlayerScript : MonoBehaviour
         {
             spriteRenderer.flipX = false;
 
-        }
-        ////Code for player camera track
-   
+        } 
     }
 
     void DelayedAction()
@@ -146,19 +142,29 @@ public class PlayerScript : MonoBehaviour
         PlayerAnim.SetBool("Attack", false);
     }
 
-     void OnDrawGizmosSelected()
+    void OnDrawGizmosSelected()
     {
-        if (AttackTrans == null)
+        if (IsFrontCheck == null)
 
             return;
-        Gizmos.DrawWireSphere(AttackTrans.position, AttackRange);
+        Gizmos.DrawWireSphere(IsFrontCheck.position, AttackRange);
     }
 
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (collision.gameObject.CompareTag("Ground"))
         {
+            isGround = true;
             PlayerAnim.SetBool("Jump", false);
-        }     
+        }
+
+     
     }
+    private IEnumerator Cooldown()
+    {       
+        isCooldown = true;
+        yield return new WaitForSeconds(CoolTimer);
+        isCooldown = false;
+    }
+
 }
